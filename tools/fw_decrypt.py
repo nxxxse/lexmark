@@ -4,6 +4,8 @@ import sys
 import os
 import struct
 import binascii
+import re
+
 from Crypto.Cipher import AES
 
 DEFAULT_KEY_INDEX = 2
@@ -99,13 +101,16 @@ class LexmarkFirmwareUnpacker:
         a = self.fh.readline()
         if a != b"\x1b%-12345X@PJL \n":
             self.err("invalid header line")
-        pjl_line_a = self.fh.readline().decode("utf8")
-        pjl_line_b = self.fh.readline().decode("utf8")
 
-        if not pjl_line_a.startswith("@PJL") or not pjl_line_b.startswith("@PJL"):
-            self.err("invalid PJL header line")
+        while True:
+            pjl_line_a = self.fh.readline().decode("utf8")
+            if not pjl_line_a.startswith("@PJL"):
+                self.err("invalid PJL header line")
+            if pjl_line_a.startswith("@PJL LPROGRAMRIP"):
+                # Skip over one or many COMMENT.
+                break
 
-        parts = pjl_line_b.split(" ")
+        parts = pjl_line_a.split(" ")
         if parts[1] != "LPROGRAMRIP":
             self.err("unexpected pjl instruction '%s'" % parts[1])
 
@@ -115,6 +120,9 @@ class LexmarkFirmwareUnpacker:
             name, value = parts[i].split("=", 1)
             if value.startswith('"'):
                 self.pjl_properties[name] = value[1 : len(value) - 1]
+            elif re.search(r'^[a-z][a-z0-9]+$', value, re.IGNORECASE):
+                # Parse: TYPE=MAIN
+                self.pjl_properties[name] = value
             else:
                 self.pjl_properties[name] = int(value, 0)
 
