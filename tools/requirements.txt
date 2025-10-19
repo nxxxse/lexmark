@@ -1,0 +1,3 @@
+pycryptodome
+pycramfs
+tqdm
